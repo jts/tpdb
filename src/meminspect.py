@@ -4,8 +4,9 @@
 # Dump the contents of memory for a given program at a given breakpoint
 # using lldb's python API
 #----------------------------------------------------------------------
+from import_lldb import *
+
 import argparse
-import lldb
 import sys
 import os
 from heapinspect import *
