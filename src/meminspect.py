@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 #----------------------------------------------------------------------
-# Dump the contents of memory for a given project at a given breakpoint
+# Dump the contents of memory for a given program at a given breakpoint
 # using lldb's python API
 #----------------------------------------------------------------------
 import argparse
