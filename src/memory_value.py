@@ -51,9 +51,9 @@ class MemoryModel:
 
             if value_as_addr is not None:
 
-                # this value is a memory address, infer the type
-                # of the data stored on the heap so we can pretty-print it
                 if value_as_addr in heap_allocs:
+                    # this value is a memory address in the heap, infer the type
+                    # of the data stored on the heap so we can pretty-print it
                     ha = heap_allocs[value_as_addr]
                     if v.type_name != "char *":
                         sys.stderr.write("Type not yet handled\n")

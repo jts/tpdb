@@ -4,15 +4,13 @@
 # Dump the contents of memory for a given project at a given breakpoint
 # using lldb's python API
 #----------------------------------------------------------------------
-from __future__ import print_function
-
-import lldb
 import argparse
-import os
+import lldb
 import sys
+import os
 from heapinspect import *
-from utils import *
 from memory_value import *
+from utils import *
 
 # Turn on malloc logging so we can track heap memory
 os.environ["MallocStackLogging"] = "malloc"

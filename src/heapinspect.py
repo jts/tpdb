@@ -168,10 +168,8 @@ def dump_stack_history_entry(memory_model, target, options, stack_history_entry,
     target_name = str(target)
 
     address = int(stack_history_entry.address)
-    #type_flags = int(stack_history_entry.type_flags)
     argument = int(stack_history_entry.argument)
-    #print("ADDR: 0x%x flags: %d argument: %d" % (address, type_flags, argument))
-    #return 
+    
     if address:
         type_flags = int(stack_history_entry.type_flags)
         type_str = type_flags_to_string(type_flags)
