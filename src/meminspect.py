@@ -45,7 +45,6 @@ for thread in process:
     # we need to provide a stack frame to execute this dump on so we pass in
     # the current frame (where the breakpoint is)
     get_heap_allocs(memory_model, target, thread.frames[0], heap_dump_options, 0, True)
-    
     for sf in thread.frames:
         get_stack_variables(memory_model, sf)
 

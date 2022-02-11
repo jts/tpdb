@@ -40,12 +40,31 @@ def get_globals(target):
     print("Globals: ", ",".join(global_names))
 
 def get_stack_variables(memory_model, frame):
+    sf_name = "stack" + "-" + frame.GetDisplayFunctionName()
     for v in frame.variables:
         section_name = v.GetAddress().GetSection().GetName()
-
         # do not display globals in stack
         if section_name == "__data":
             continue
-        
-        mv = MemoryValue("stack" + "-" + frame.GetDisplayFunctionName(), int(v.location, 16), v.GetByteSize(), str(v.GetValue()), v.GetName(), str(v.GetType()))
-        memory_model.add(mv)
+       
+        if v.num_children == 0: 
+            mv = MemoryValue(sf_name, int(v.location, 16), v.GetByteSize(), str(v.GetValue()), v.GetName(), str(v.GetType()))
+            memory_model.add(mv)
+        else:
+            # this is an array or struct
+            name = v.GetName()
+            for i in range(0, v.num_children):
+                child = v.GetChildAtIndex(i)
+
+                # pretty print the name
+                child_name = child.GetName()
+                if child_name[0] == '[' and child_name[-1] == ']':
+                    # array
+                    name = v.GetName() + child.GetName()
+                else:
+                    # assume struct
+                    name = v.GetName() + "." +child.GetName()
+
+                mv = MemoryValue(sf_name, int(child.location, 16), child.GetByteSize(), str(child.GetValue()), name, str(child.GetType()))
+                memory_model.add(mv)
+                # only print the name for the first entry
