@@ -47,7 +47,7 @@ def get_stack_variables(memory_model, frame):
         if section_name == "__data":
             continue
        
-        if v.num_children == 0: 
+        if v.num_children == 0 or v.TypeIsPointerType(): 
             mv = MemoryValue(sf_name, int(v.location, 16), v.GetByteSize(), str(v.GetValue()), v.GetName(), str(v.GetType()))
             memory_model.add(mv)
         else:

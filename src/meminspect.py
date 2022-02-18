@@ -5,6 +5,7 @@
 # using lldb's python API
 #----------------------------------------------------------------------
 from import_lldb import *
+import lldb.utils.symbolication
 
 import argparse
 import sys
@@ -22,7 +23,8 @@ lldb.debugger.SetAsync(False)
 target = lldb.debugger.CreateTarget(sys.argv[1])
 
 # set the breakpoint where we want the memory dump to occur
-breakpoint0 = target.BreakpointCreateByLocation(sys.argv[2], int(sys.argv[3]))
+#breakpoint0 = target.BreakpointCreateByLocation(sys.argv[2], int(sys.argv[3]))
+breakpoint0 = target.BreakpointCreateByName("main")
 
 # launch the process, it will run until the breakpoint is hit
 process = target.LaunchSimple(None, None, os.getcwd())
@@ -32,23 +34,31 @@ heap_dump_options = HeapDumpOptions()
 # the memory values we harvest from the debugger are stored here
 memory_model = MemoryModel()
 
-# header
-print("\t".join( [ "section", "address", "size", "value", "label", "type" ] ))
-
 #get_globals(target)
 get_text_section(memory_model, target)
 
+n_instructions = int(sys.argv[2])
+
+#symbolicator = lldb.utils.symbolication.Symbolicator()
+#symbolicator.target = target
+
 # print everything in the stack frame
 for thread in process:
+    
+    # for unknown reasons we need to make a step before we can start getting data from the heap
+    thread.StepOver()
+    for _ in range(0, n_instructions):
+        thread.StepOver()
+        sf = thread.GetSelectedFrame()
+        le = sf.GetLineEntry()
 
-    # get all the allocations on the heap up to this point of the programs execution
-    # we need to provide a stack frame to execute this dump on so we pass in
-    # the current frame (where the breakpoint is)
-    get_heap_allocs(memory_model, target, thread.frames[0], heap_dump_options, 0, True)
-    for sf in thread.frames:
-        get_stack_variables(memory_model, sf)
+    heap = get_heap(target, thread.GetSelectedFrame(), heap_dump_options, 0, True)
+    print(heap)
+    memory_model.set_heap_data(heap)
 
-memory_model.resolve_heap(process)
+    for frame in thread.frames:
+        sf_name = "stack" + "-" + frame.GetDisplayFunctionName()
+        for v in frame.variables:
+            memory_model.add_from_stack(process, sf_name, v)
 
-for v in memory_model.values:
-    print(v)
+memory_model.write_tsv()

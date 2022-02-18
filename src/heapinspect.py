@@ -19,7 +19,7 @@ class HeapDumpOptions:
         self.verbose = False
 
 # all of this is from heap.py
-def get_heap_allocs(memory_model, target, frame, options, addr, history):
+def get_heap(target, frame, options, addr, history):
     # malloc_stack_entry *get_stack_history_for_address (const void * addr)
     expr_prefix = '''
 typedef int kern_return_t;
@@ -123,6 +123,9 @@ lldb_info''' % (options.max_frames, options.max_history, addr)
         print(expr)
         print("expression result:")
         print(expr_sbvalue)
+
+    heap_allocs = list()
+
     if expr_sbvalue.error.Success():
         if history:
             malloc_stack_history = lldb.value(expr_sbvalue)
@@ -133,13 +136,13 @@ lldb_info''' % (options.max_frames, options.max_history, addr)
                 i_max = options.max_history
             for i in range(i_max):
                 stack_history_entry = malloc_stack_history.entries[i]
-                dump_stack_history_entry(memory_model, target, options, stack_history_entry, i)
+                get_heap_alloc(heap_allocs, target, options, stack_history_entry, i)
         else:
             stack_history_entry = lldb.value(expr_sbvalue)
-            dump_stack_history_entry(memory_model, target, options, stack_history_entry, 0)
-
+            get_heap_alloc(heap_allocs, target, options, stack_history_entry, 0)
     else:
         sys.stderr.write("Failure to get heap data")
+    return heap_allocs
 
 def type_flags_to_string(type_flags):
     if type_flags == 0:
@@ -162,7 +165,7 @@ def type_flags_to_string(type_flags):
         type_str = hex(type_flags)
     return type_str
 
-def dump_stack_history_entry(memory_model, target, options, stack_history_entry, idx):
+def get_heap_alloc(heap_allocs, target, options, stack_history_entry, idx):
     symbolicator = lldb.utils.symbolication.Symbolicator()
     symbolicator.target = target
     target_name = str(target)
@@ -201,6 +204,4 @@ def dump_stack_history_entry(memory_model, target, options, stack_history_entry,
             else:
                 pc = 0
         if allocation_in_user_code:
-            value = MemoryValue("heap", address, argument, None, None, None)
-            memory_model.add(value)
-
+            heap_allocs.append( (address, argument, type_str) )

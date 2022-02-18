@@ -2,6 +2,7 @@
 
 import lldb
 import sys
+from heapinspect import *
 
 class MemoryValue:
     def __init__(self, section, address, size, value, label, type_name):
@@ -24,40 +25,83 @@ class MemoryValue:
 
 class MemoryModel:
     def __init__(self):
-        self.values = list()
+        self.memory = dict()
+        self.heap_alloc_sizes = dict()
 
     def add(self, value):
-        self.values.append(value)
+        self.memory[value.address] = value
 
-    def resolve_heap(self, process):
+    def set_heap_data(self, heap_allocs):
+        for (addr, alloc_size, type_str) in heap_allocs:
+            print("heap allocation found", addr, alloc_size, type_str)
+            self.heap_alloc_sizes[addr] = alloc_size
 
-        # Get a dictionary of all heap allocations
-        heap_allocs = dict()
-        for v in self.values:
-            if v.section == "heap":
-                heap_allocs[v.address] = v
+    def add_from_stack(self, process, section_name, v):
 
-        # Search all other variables for pointers to a heap block
-        for v in self.values:
-            if v.section == "heap":
-                continue
-            
-            # try to interpret the value as a memory address in hex
-            value_as_addr = None
-            try:
-                value_as_addr = int(v.value, 16)
-            except:
-                pass
+        # global variables show up on the stack frame, do not add them to the memory model
+        if v.GetAddress().GetSection().GetName() == "__data":
+            return
 
-            if value_as_addr is not None:
+        #print(section_name, v.location, v.num_children)
 
-                if value_as_addr in heap_allocs:
-                    # this value is a memory address in the heap, infer the type
-                    # of the data stored on the heap so we can pretty-print it
-                    ha = heap_allocs[value_as_addr]
-                    if v.type_name != "char *":
-                        sys.stderr.write("Type not yet handled\n")
-                        sys.exit(1)
-                    error = lldb.SBError()
-                    data = process.ReadMemory(value_as_addr, ha.size, error)
-                    ha.value = str(data)
+        # Store POD stack variables and pointers to the memory model
+        # More complicated stack variables (structs, arrays) are handled below
+        if v.num_children == 0 or v.TypeIsPointerType():
+            mv = MemoryValue(section_name, int(v.location, 16), v.GetByteSize(), str(v.GetValue()), v.GetName(), str(v.GetType()))
+            self.add(mv)
+
+        # If POD stack variable return now, nothing else to do
+        if v.num_children == 0 and not v.TypeIsPointerType():
+            return
+
+        # If this is a pointer we need to figure out whether it points to the stack or heap
+        # if its on the heap we recurse to parse the heap data
+        if v.TypeIsPointerType():
+            d = v.Dereference()
+
+            # very hacky way to determine whether on stack or heap
+            diff = d.GetLoadAddress() - v.GetLoadAddress()
+            if diff > 100000:
+                section_name = "heap"
+            else:
+                # this is a pointer to non-heap data, nothing else to do
+                return
+
+            # get the size of this heap allocation, we need this to work out 
+            # how many items it points to
+            if d.location is not None and d.location != '':
+                heap_addr = int(d.location, 16)
+                if heap_addr in self.heap_alloc_sizes:
+                    heap_alloc_size = self.heap_alloc_sizes[heap_addr]
+                    element_size = d.GetByteSize()
+                    base_address = d.GetLoadAddress()
+                    num_elems = int(heap_alloc_size / element_size)
+                    for i in range(0, num_elems):
+                        elem = d.CreateValueFromAddress("(none)", base_address, d.GetType())
+                        print(i, num_elems, base_address, elem)
+                        self.add_from_stack(process, section_name, elem)
+                        base_address += element_size
+        else:
+            # this is an array or struct
+            name = v.GetName()
+            for i in range(0, v.num_children):
+                child = v.GetChildAtIndex(i)
+
+                # pretty print the name
+                child_name = child.GetName()
+                if child_name[0] == '[' and child_name[-1] == ']':
+                    # array
+                    name = v.GetName() + child.GetName()
+                else:
+                    # assume struct
+                    name = v.GetName() + "." +child.GetName()
+
+                mv = MemoryValue(section_name, int(child.location, 16), child.GetByteSize(), str(child.GetValue()), name, str(child.GetType()))
+                self.add(mv)
+
+    def write_tsv(self):
+        # header
+        print("\t".join( [ "section", "address", "size", "value", "label", "type" ] ))
+
+        for addr in sorted(self.memory.keys()):
+            print(self.memory[addr])
