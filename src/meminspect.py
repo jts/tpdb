@@ -10,7 +10,6 @@ import lldb.utils.symbolication
 import argparse
 import sys
 import os
-from heapinspect import *
 from memory_value import *
 from utils import *
 
@@ -43,7 +42,6 @@ run_commands(command_interpreter, ['settings set target.process.thread.step-in-a
 #breakpoint1 = target.BreakpointCreateByName("malloc")
 #breakpoint1 = target.BreakpointCreateByName("malloc")
 #breakpoint1 = target.BreakpointCreateByAddress("0x100003f90")
-heap_dump_options = HeapDumpOptions()
 
 # the memory values we harvest from the debugger are stored here
 memory_model = MemoryModel()
@@ -51,10 +49,11 @@ memory_model = MemoryModel()
 #get_globals(target)
 get_text_section(memory_model, target)
 
-n_instructions = int(sys.argv[2])
+n_steps = int(sys.argv[2])
 
-# print everything in the stack frame
-for _ in range(0, n_instructions):
+# Run for the specified number of steps, tracking memory
+# along the way
+for _ in range(0, n_steps):
 
     for thread in process:
 
@@ -62,7 +61,7 @@ for _ in range(0, n_instructions):
         sf = thread.GetSelectedFrame()
         current_function = sf.GetFunctionName()
         le = sf.GetLineEntry()
-        print(current_function, thread.GetStopReason(), le)
+        print(current_function, le)
         if current_function == "malloc":
             handle_malloc(memory_model, thread)
 

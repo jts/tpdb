@@ -2,7 +2,6 @@
 
 import lldb
 import sys
-from heapinspect import *
 
 class MemoryValue:
     def __init__(self, section, address, size, value, label, type_name):
@@ -76,7 +75,7 @@ class MemoryModel:
                     num_elems = int(heap_alloc_size / element_size)
                     for i in range(0, num_elems):
                         elem = d.CreateValueFromAddress("(none)", base_address, d.GetType())
-                        print(i, num_elems, base_address, elem)
+                        #print(i, num_elems, base_address, elem)
                         self.add_from_stack(process, section_name, elem)
                         base_address += element_size
         else:
