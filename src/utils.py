@@ -68,3 +68,43 @@ def get_stack_variables(memory_model, frame):
                 mv = MemoryValue(sf_name, int(child.location, 16), child.GetByteSize(), str(child.GetValue()), name, str(child.GetType()))
                 memory_model.add(mv)
                 # only print the name for the first entry
+
+# from: https://github.com/llvm/llvm-project/blob/main/lldb/examples/python/process_events.py#L65
+def run_commands(command_interpreter, commands):
+    return_obj = lldb.SBCommandReturnObject()
+    for command in commands:
+        command_interpreter.HandleCommand(command, return_obj)
+        if return_obj.Succeeded():
+            print(return_obj.GetOutput())
+        else:
+            print(return_obj)
+
+def handle_malloc(memory_model, thread):
+    handle_malloc_arm(memory_model, thread)
+
+def handle_malloc_arm(memory_model, thread):
+
+    debug_handle_malloc = True
+
+    # determine if this is the target code's call to malloc
+    if debug_handle_malloc:
+        print("Handle malloc\n\tstack:")
+        for fidx, f in enumerate(thread.frames):
+            print("\t\tF[%d]: %s %s" %(fidx, thread.frames[fidx].GetFunctionName(), thread.frames[fidx].GetLineEntry()))
+
+    # malloc's size argument is put in register x0
+    x0 = thread.GetSelectedFrame().FindRegister("x0")
+    error = lldb.SBError()
+    malloc_size = x0.GetData().GetUnsignedInt64(error, 0)
+
+    # advance the thread back to the calling function
+    thread.StepOut()
+
+    # malloc's size argument is returned in register x0
+    x0 = thread.GetSelectedFrame().FindRegister("x0")
+    malloc_ptr = x0.GetData().GetUnsignedInt64(error, 0)
+    memory_model.add_heap_alloc(malloc_ptr, malloc_size)
+
+    if debug_handle_malloc:
+        print("\tmalloc addr:0x%x size:%lu" % (malloc_ptr, malloc_size))
+        print("\treturned to", thread.GetSelectedFrame().GetFunctionName())

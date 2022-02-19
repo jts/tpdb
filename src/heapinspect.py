@@ -188,7 +188,7 @@ def get_heap_alloc(heap_allocs, target, options, stack_history_entry, idx):
                         func_call_str = str(frame.symbolication)
 
                         # This checks whether a function called within the target
-                        # is the second entry after the stack, which indicates it was a 
+                        # is the second entry in the stack, which indicates it was a 
                         # malloc() (or related function) call within our program of interest
                         if frame_idx == 1 and func_call_str.startswith(target_name):
                             allocation_in_user_code = True

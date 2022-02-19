@@ -31,11 +31,9 @@ class MemoryModel:
     def add(self, value):
         self.memory[value.address] = value
 
-    def set_heap_data(self, heap_allocs):
-        for (addr, alloc_size, type_str) in heap_allocs:
-            print("heap allocation found", addr, alloc_size, type_str)
-            self.heap_alloc_sizes[addr] = alloc_size
-
+    def add_heap_alloc(self, address, size):
+        self.heap_alloc_sizes[address] = size
+    
     def add_from_stack(self, process, section_name, v):
 
         # global variables show up on the stack frame, do not add them to the memory model
