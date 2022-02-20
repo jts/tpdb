@@ -24,5 +24,6 @@ int main()
     printf("arr size: %d\n", n);
 
     int (*func_ptr)(int, int) = sum;
-    func_ptr(3, 2);
+    int z = func_ptr(3, 2);
+    printf("%d\n", z);
 }

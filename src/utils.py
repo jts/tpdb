@@ -88,7 +88,7 @@ def handle_free(memory_model, thread):
 
 def handle_malloc_arm(memory_model, thread):
 
-    debug_handle_malloc = True
+    debug_handle_malloc = False
 
     # determine if this is the target code's call to malloc
     if debug_handle_malloc:
