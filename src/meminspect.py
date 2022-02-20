@@ -13,9 +13,6 @@ import os
 from memory_value import *
 from utils import *
 
-# Turn on malloc logging so we can track heap memory
-os.environ["MallocStackLogging"] = "malloc"
-
 # initialize debugger, load the target
 debugger = lldb.SBDebugger.Create()
 debugger.SetAsync(False)

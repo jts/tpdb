@@ -1,5 +1,6 @@
 import lldb
 from memory_value import *
+
 def get_text_section(memory_model, target):
 
     module = target.module[target.executable.basename]
