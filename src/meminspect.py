@@ -35,6 +35,7 @@ process = target.Launch(launch_info, error)
 
 #https://github.com/llvm/llvm-project/blob/main/lldb/examples/python/process_events.py
 debugger.HandleCommand("_regexp-break malloc")
+debugger.HandleCommand("_regexp-break free")
 run_commands(command_interpreter, ['breakpoint list'])
 #run_commands(command_interpreter, ['settings set target.process.virtual-addressable-bits 39'])
 #run_commands(command_interpreter, ['settings show'])
@@ -64,6 +65,8 @@ for _ in range(0, n_steps):
         print(current_function, le)
         if current_function == "malloc":
             handle_malloc(memory_model, thread)
+        elif current_function == "free":
+            handle_free(memory_model, thread)
 
     for frame in thread.frames:
         sf_name = "stack" + "-" + frame.GetDisplayFunctionName()

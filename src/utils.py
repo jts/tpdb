@@ -82,6 +82,9 @@ def run_commands(command_interpreter, commands):
 def handle_malloc(memory_model, thread):
     handle_malloc_arm(memory_model, thread)
 
+def handle_free(memory_model, thread):
+    handle_free_arm(memory_model, thread)
+
 def handle_malloc_arm(memory_model, thread):
 
     debug_handle_malloc = True
@@ -108,3 +111,16 @@ def handle_malloc_arm(memory_model, thread):
     if debug_handle_malloc:
         print("\tmalloc addr:0x%x size:%lu" % (malloc_ptr, malloc_size))
         print("\treturned to", thread.GetSelectedFrame().GetFunctionName())
+
+def handle_free_arm(memory_model, thread):
+
+    # malloc's size argument is put in register x0
+    x0 = thread.GetSelectedFrame().FindRegister("x0")
+    error = lldb.SBError()
+    free_ptr = x0.GetData().GetUnsignedInt64(error, 0)
+    memory_model.add_heap_alloc(free_ptr, 0)
+
+    # advance the thread back to the calling function
+    thread.StepOut()
+    
+    print("\tfree addr:0x%x" % (free_ptr))
