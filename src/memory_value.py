@@ -185,11 +185,32 @@ class MemoryModel:
                     element_size = d.GetByteSize()
                     base_address = d.GetLoadAddress()
                     num_elems = int(heap_alloc_size / element_size)
-                    for i in range(0, num_elems):
-                        elem = d.CreateValueFromAddress("(none)", base_address, d.GetType())
-                        #print(i, num_elems, base_address, elem)
-                        self.add_from_stack(process, section_name, elem)
-                        base_address += element_size
+                    if str(d.GetType()) == "char":
+                        # handle heap string
+                        s = ""
+                        for i in range(0, num_elems):
+                            elem = d.CreateValueFromAddress("(none)", base_address, d.GetType())
+                            #print(i, elem, heap_alloc_size)
+                            s += elem.GetValue()[1:-1]
+                            base_address += element_size
+                        mv = MemoryValue(section_name, int(d.location, 16), heap_alloc_size, s, "(none)", str(d.GetType()))
+                        self.add(mv)
+
+                    else:
+                        # all other datatypes
+                        for i in range(0, num_elems):
+                            elem = d.CreateValueFromAddress("(none)", base_address, d.GetType())
+                            #print(i, num_elems, base_address, elem)
+                            self.add_from_stack(process, section_name, elem)
+                            base_address += element_size
+
+        elif str(v.GetType().GetArrayElementType()) == "char":
+            # special case for character array
+            s = ""
+            for i in range(0, v.num_children):
+                s += (v.GetChildAtIndex(i).GetValue())[1:-1]
+            mv = MemoryValue(section_name, int(v.location, 16), v.GetByteSize(), s, v.GetName(), str(v.GetType()))
+            self.add(mv)
         else:
             # this is an array or struct
             name = v.GetName()
