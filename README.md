@@ -10,15 +10,15 @@ First, compile the demo program with debugging symbols turned on:
 gcc -Wall -g -o example/demo example/demo.c
 ```
 
-This will dump memory as a .tsv file once execution hits line 12 of demo.c
+Launch curses-based debugger:
 
 ```
-python3 src/meminspect.py example/demo demo.c 12 | column -t
+python3 src/tpdb.py example/demo
 ```
 
 ## Notes
 
-This will only work on MacOS. 
+If you receive lldb import errors you need to set PYTHONPATH to location of lldb python modules. This seems to not be set consistently on some linux distros. If you receive a launch error about "lldb-server" set this environment variable: `export LLDB_DEBUGSERVER_PATH=/usr/lib/llvm-6.0/bin/lldb-server` (you may need to change the path depending on your version of llvm).
 
 ## Credit
 
