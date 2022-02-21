@@ -42,12 +42,14 @@ class ProgramState:
         self.target = self.debugger.CreateTarget(program_name)
         # put a breakpoint on main before we launch so our initial state is there
         self.target.BreakpointCreateByName("main")
-    
+        self.arch = self.target.triple.split("-")[0]
+
         # launch the process, it will run until the breakpoint is hit
         launch_info = lldb.SBLaunchInfo(None)
         error = lldb.SBError()
         self.process = self.target.Launch(launch_info, error)
         run_commands(self.command_interpreter, ['settings set target.process.thread.step-in-avoid-nodebug false'])
+        print(error)
 
         # put breakpoints on malloc and free
         #https://github.com/llvm/llvm-project/blob/main/lldb/examples/python/process_events.py
@@ -91,9 +93,9 @@ class ProgramState:
                 self.function_name = thread.GetSelectedFrame().GetFunctionName()
 
                 if self.function_name == "malloc":
-                    handle_malloc(memory_model, thread)
+                    handle_malloc(memory_model, thread, self.arch)
                 elif self.function_name == "free":
-                    handle_free(memory_model, thread)
+                    handle_free(memory_model, thread, self.arch)
 
                 # Lazy way of detecting when we're in non-user functions
                 while thread.GetSelectedFrame().GetLineEntry().GetFileSpec().GetFilename() is None: 
@@ -131,6 +133,9 @@ class MemoryModel:
 
         # global variables show up on the stack frame, do not add them to the memory model
         if v.GetAddress().GetSection().GetName() == "__data":
+            return
+
+        if v.location == '' or v.location == "rdi" or v.location == "rax":
             return
 
         # Store POD stack variables and pointers to the memory model

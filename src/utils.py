@@ -80,14 +80,21 @@ def run_commands(command_interpreter, commands):
         else:
             print(return_obj)
 
-def handle_malloc(memory_model, thread):
-    handle_malloc_arm(memory_model, thread)
+x86_arg_registers = [ "rdi", "rsi", "rdx", "rcx" ]
+def get_register_for_argument(arg_index, arch):
+    assert(arg_index < 4)
+    if arch == "arm":
+        return "x" + str(arg_index)
+    else:
+        return x86_arg_registers[arg_index]
 
-def handle_free(memory_model, thread):
-    handle_free_arm(memory_model, thread)
+def get_register_for_return_value(arch):
+    if arch == "arm":
+        return "x0"
+    else:
+        return "rax"
 
-def handle_malloc_arm(memory_model, thread):
-
+def handle_malloc(memory_model, thread, arch):
     debug_handle_malloc = False
 
     # determine if this is the target code's call to malloc
@@ -96,32 +103,31 @@ def handle_malloc_arm(memory_model, thread):
         for fidx, f in enumerate(thread.frames):
             print("\t\tF[%d]: %s %s" %(fidx, thread.frames[fidx].GetFunctionName(), thread.frames[fidx].GetLineEntry()))
 
-    # malloc's size argument is put in register x0
-    x0 = thread.GetSelectedFrame().FindRegister("x0")
+    # malloc's size argument is put in first argument register
+    arg0 = thread.GetSelectedFrame().FindRegister( get_register_for_argument(0, arch) )
+    print("Register:", arg0)
     error = lldb.SBError()
-    malloc_size = x0.GetData().GetUnsignedInt64(error, 0)
+    malloc_size = arg0.GetData().GetUnsignedInt64(error, 0)
 
     # advance the thread back to the calling function
     thread.StepOut()
 
-    # malloc's size argument is returned in register x0
-    x0 = thread.GetSelectedFrame().FindRegister("x0")
-    malloc_ptr = x0.GetData().GetUnsignedInt64(error, 0)
+    # malloc's size argument is returned in register x0 on arm, or rax in x86
+    ret = thread.GetSelectedFrame().FindRegister( get_register_for_return_value(arch) )
+    malloc_ptr = ret.GetData().GetUnsignedInt64(error, 0)
     memory_model.add_heap_alloc(malloc_ptr, malloc_size)
 
     if debug_handle_malloc:
         print("\tmalloc addr:0x%x size:%lu" % (malloc_ptr, malloc_size))
         print("\treturned to", thread.GetSelectedFrame().GetFunctionName())
 
-def handle_free_arm(memory_model, thread):
-
-    # malloc's size argument is put in register x0
-    x0 = thread.GetSelectedFrame().FindRegister("x0")
+def handle_free(memory_model, thread, arch):
+    arg0 = thread.GetSelectedFrame().FindRegister( get_register_for_argument(0, arch) )
     error = lldb.SBError()
-    free_ptr = x0.GetData().GetUnsignedInt64(error, 0)
+    free_ptr = arg0.GetData().GetUnsignedInt64(error, 0)
     memory_model.add_heap_alloc(free_ptr, 0)
 
     # advance the thread back to the calling function
     thread.StepOut()
     
-    print("\tfree addr:0x%x" % (free_ptr))
+    #print("\tfree addr:0x%x" % (free_ptr))

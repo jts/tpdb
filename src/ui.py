@@ -79,7 +79,7 @@ class OutputWindow:
 class MemoryWindow:
     def __init__(self, x_start, y_start, height, section_name):
         line_num = 0
-        
+        self.max_lines = height - 2 * border_width
         self.addr_window = curses.newwin(height, addr_width, y_start, x_start)
         self.max_addr_length = addr_width - 2 * border_width - 2
 
@@ -108,6 +108,9 @@ class MemoryWindow:
         self.label_window.refresh()
 
     def set(self, idx, value):
+
+        if idx >= self.max_lines:
+            return
 
         astr = pad_or_truncate(value.get_addr_as_str(), self.max_addr_length)
         self.addr_window.addstr(idx + border_width, 1 + border_width, astr)
