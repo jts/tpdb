@@ -14,7 +14,7 @@ from memory_value import *
 from utils import *
 
 program = ProgramState(sys.argv[1])
-print(program.arch)
+
 #run_commands(command_interpreter, ['settings set target.process.virtual-addressable-bits 39'])
 #run_commands(command_interpreter, ['settings show'])
 #breakpoint1 = target.BreakpointCreateByName("malloc")

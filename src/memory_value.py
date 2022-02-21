@@ -40,28 +40,32 @@ class ProgramState:
         self.debugger.SetAsync(False)
         self.command_interpreter = self.debugger.GetCommandInterpreter()
         self.target = self.debugger.CreateTarget(program_name)
+
         # put a breakpoint on main before we launch so our initial state is there
         self.target.BreakpointCreateByName("main")
+        
         self.arch = self.target.triple.split("-")[0]
 
         # launch the process, it will run until the breakpoint is hit
         launch_info = lldb.SBLaunchInfo(None)
         error = lldb.SBError()
         self.process = self.target.Launch(launch_info, error)
+        if not error.Success():
+            print(error)
+            sys.exit(1)
+        
         run_commands(self.command_interpreter, ['settings set target.process.thread.step-in-avoid-nodebug false'])
-        print(error)
-
         # put breakpoints on malloc and free
-        #https://github.com/llvm/llvm-project/blob/main/lldb/examples/python/process_events.py
-        self.debugger.HandleCommand("_regexp-break malloc")
-        self.debugger.HandleCommand("_regexp-break free")
+        self.target.BreakpointCreateByName("malloc")
+        self.target.BreakpointCreateByName("free")
 
         sf = self.process.GetSelectedThread().GetSelectedFrame()
         self.line_entry = sf.GetLineEntry()
         self.function_name = sf.GetFunctionName()
+        self.main_filename = sf.GetLineEntry().GetFileSpec().GetFilename()
         self.code = dict()
         self.stdout = list()
-
+        
     def get_code(self):
         d = self.line_entry.GetFileSpec().GetDirectory()
         f = self.line_entry.GetFileSpec().GetFilename()
@@ -83,22 +87,27 @@ class ProgramState:
         return self.line_entry.GetLine()
 
     def step(self, memory_model, n_steps=1):
-        if not self.process.IsValid():
-            return
 
         for _ in range(0, n_steps):
+            if self.process.state == lldb.eStateExited:
+                return
+
             for thread in self.process:
+                sf = thread.GetSelectedFrame()
 
                 thread.StepInto()
                 self.function_name = thread.GetSelectedFrame().GetFunctionName()
-
-                if self.function_name == "malloc":
+                
+                # glibc malloc has mangled function names
+                if self.function_name.endswith("malloc"):
                     handle_malloc(memory_model, thread, self.arch)
-                elif self.function_name == "free":
+                elif self.function_name.endswith("free"):
                     handle_free(memory_model, thread, self.arch)
 
                 # Lazy way of detecting when we're in non-user functions
-                while thread.GetSelectedFrame().GetLineEntry().GetFileSpec().GetFilename() is None: 
+                # This won't handle programs with code in multiple files
+                while self.process.state != lldb.eStateExited and \
+                    thread.GetSelectedFrame().GetLineEntry().GetFileSpec().GetFilename() != self.main_filename: 
                     thread.StepOut()
                 
                 # the handle functions can advance the state so these must be set again 
@@ -106,10 +115,14 @@ class ProgramState:
                 self.line_entry = thread.GetSelectedFrame().GetLineEntry()
             
             # Update stack
-            for frame in thread.frames:
-                sf_name = "stack" + "-" + frame.GetDisplayFunctionName()
-                for v in frame.variables:
-                    memory_model.add_from_stack(self.process, sf_name, v)
+            if self.process.state != lldb.eStateExited:
+                for frame in thread.frames:
+                    # in x86-64 the first stack frame is start before handing to main, skip it
+                    sf_name = "stack" + "-" + frame.GetDisplayFunctionName()
+                    if "__libc_start" in sf_name:
+                        continue
+                    for v in frame.variables:
+                        memory_model.add_from_stack(self.process, sf_name, v)
 
             # Update stdout
             max_chars = 120
@@ -131,11 +144,14 @@ class MemoryModel:
     
     def add_from_stack(self, process, section_name, v):
 
+        #print(v.GetName(), v.GetAddress().GetSection().GetName(), v.location)
         # global variables show up on the stack frame, do not add them to the memory model
-        if v.GetAddress().GetSection().GetName() == "__data":
+        sn = v.GetAddress().GetSection().GetName()
+        if sn == "__data" or sn == ".data":
             return
 
-        if v.location == '' or v.location == "rdi" or v.location == "rax":
+        # slightly lame, this discards variables that are in registers
+        if not v.location.startswith("0x"):
             return
 
         # Store POD stack variables and pointers to the memory model
@@ -152,9 +168,8 @@ class MemoryModel:
         # if its on the heap we recurse to parse the heap data
         if v.TypeIsPointerType():
             d = v.Dereference()
-
             # very hacky way to determine whether on stack or heap
-            diff = d.GetLoadAddress() - v.GetLoadAddress()
+            diff = abs(d.GetLoadAddress() - v.GetLoadAddress())
             if diff > 100000:
                 section_name = "heap"
             else:

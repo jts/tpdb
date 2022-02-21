@@ -40,45 +40,16 @@ def get_globals(target):
     #TODO: finish
     print("Globals: ", ",".join(global_names))
 
-def get_stack_variables(memory_model, frame):
-    sf_name = "stack" + "-" + frame.GetDisplayFunctionName()
-    for v in frame.variables:
-        section_name = v.GetAddress().GetSection().GetName()
-        # do not display globals in stack
-        if section_name == "__data":
-            continue
-       
-        if v.num_children == 0 or v.TypeIsPointerType(): 
-            mv = MemoryValue(sf_name, int(v.location, 16), v.GetByteSize(), str(v.GetValue()), v.GetName(), str(v.GetType()))
-            memory_model.add(mv)
-        else:
-            # this is an array or struct
-            name = v.GetName()
-            for i in range(0, v.num_children):
-                child = v.GetChildAtIndex(i)
-
-                # pretty print the name
-                child_name = child.GetName()
-                if child_name[0] == '[' and child_name[-1] == ']':
-                    # array
-                    name = v.GetName() + child.GetName()
-                else:
-                    # assume struct
-                    name = v.GetName() + "." +child.GetName()
-
-                mv = MemoryValue(sf_name, int(child.location, 16), child.GetByteSize(), str(child.GetValue()), name, str(child.GetType()))
-                memory_model.add(mv)
-                # only print the name for the first entry
-
 # from: https://github.com/llvm/llvm-project/blob/main/lldb/examples/python/process_events.py#L65
-def run_commands(command_interpreter, commands):
+def run_commands(command_interpreter, commands, print_output=False):
     return_obj = lldb.SBCommandReturnObject()
     for command in commands:
         command_interpreter.HandleCommand(command, return_obj)
-        if return_obj.Succeeded():
-            print(return_obj.GetOutput())
-        else:
-            print(return_obj)
+        if print_output:
+            if return_obj.Succeeded():
+                print(return_obj.GetOutput())
+            else:
+                print(return_obj)
 
 x86_arg_registers = [ "rdi", "rsi", "rdx", "rcx" ]
 def get_register_for_argument(arg_index, arch):
@@ -105,7 +76,6 @@ def handle_malloc(memory_model, thread, arch):
 
     # malloc's size argument is put in first argument register
     arg0 = thread.GetSelectedFrame().FindRegister( get_register_for_argument(0, arch) )
-    print("Register:", arg0)
     error = lldb.SBError()
     malloc_size = arg0.GetData().GetUnsignedInt64(error, 0)
 
