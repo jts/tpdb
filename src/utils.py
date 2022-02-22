@@ -54,20 +54,19 @@ def run_commands(command_interpreter, commands, print_output=False):
 x86_arg_registers = [ "rdi", "rsi", "rdx", "rcx" ]
 def get_register_for_argument(arg_index, arch):
     assert(arg_index < 4)
-    if arch == "arm":
+    if arch == "arm64":
         return "x" + str(arg_index)
     else:
         return x86_arg_registers[arg_index]
 
 def get_register_for_return_value(arch):
-    if arch == "arm":
+    if arch == "arm64":
         return "x0"
     else:
         return "rax"
 
 def handle_malloc(memory_model, thread, arch):
     debug_handle_malloc = False
-
     # determine if this is the target code's call to malloc
     if debug_handle_malloc:
         print("Handle malloc\n\tstack:")

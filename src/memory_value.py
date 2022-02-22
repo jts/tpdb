@@ -198,7 +198,6 @@ class MemoryModel:
                             base_address += element_size
                         mv = MemoryValue(section_name, int(d.location, 16), heap_alloc_size, s, "(none)", str(d.GetType()))
                         self.add(mv)
-
                     else:
                         # all other datatypes
                         for i in range(0, num_elems):
