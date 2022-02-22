@@ -184,8 +184,10 @@ def main(stdscr, program):
         code_window.draw()
         output_window.draw()
 
-        key = code_window.window.getstr()
+        #key = code_window.window.getstr()
+        key = code_window.window.getch()
         program.step(memory_model)
+        curses.napms(50)
  
 #       
 program = ProgramState(sys.argv[1])

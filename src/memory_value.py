@@ -135,6 +135,9 @@ class MemoryModel:
 
         self.memory = dict()
         self.heap_alloc_sizes = dict()
+    
+    def clear(self):
+        self.memory.clear()
 
     def add(self, value):
         self.memory[value.address] = value
