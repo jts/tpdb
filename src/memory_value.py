@@ -87,14 +87,16 @@ class ProgramState:
         return self.line_entry.GetLine()
 
     def get_stack_frame_name(self, frame):
-        return "stack" + " " + frame.GetDisplayFunctionName()
+        fn = frame.GetDisplayFunctionName()
+        if fn == None:
+            fn = "(none)"
+        return "stack" + " " + fn
 
     def get_active_stack_frames(self):
         thread = self.process.GetSelectedThread()
         out = list()
         for f in thread.frames:
-            if f is not None:
-                out.append(self.get_stack_frame_name(f))
+            out.append(self.get_stack_frame_name(f))
         return out
 
     def step(self, memory_model, n_steps=1):
