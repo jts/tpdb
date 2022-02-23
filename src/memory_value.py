@@ -86,50 +86,74 @@ class ProgramState:
     def get_line_number(self):
         return self.line_entry.GetLine()
 
+    def get_stack_frame_name(self, frame):
+        return "stack" + " " + frame.GetDisplayFunctionName()
+
+    def get_active_stack_frames(self):
+        thread = self.process.GetSelectedThread()
+        out = list()
+        for f in thread.frames:
+            out.append(self.get_stack_frame_name(f))
+        return out
+
     def step(self, memory_model, n_steps=1):
-
         for _ in range(0, n_steps):
-            if self.process.state == lldb.eStateExited:
-                return
-
-            for thread in self.process:
-                sf = thread.GetSelectedFrame()
-
-                thread.StepInto()
-                self.function_name = thread.GetSelectedFrame().GetFunctionName()
-                
-                # glibc malloc has mangled function names
-                if self.function_name.endswith("malloc"):
-                    handle_malloc(memory_model, thread, self.arch)
-                elif self.function_name.endswith("free"):
-                    handle_free(memory_model, thread, self.arch)
-
-                # Lazy way of detecting when we're in non-user functions
-                # This won't handle programs with code in multiple files
-                while self.process.state != lldb.eStateExited and \
-                    thread.GetSelectedFrame().GetLineEntry().GetFileSpec().GetFilename() != self.main_filename: 
-                    thread.StepOut()
-                
-                # the handle functions can advance the state so these must be set again 
-                self.function_name = thread.GetSelectedFrame().GetFunctionName()
-                self.line_entry = thread.GetSelectedFrame().GetLineEntry()
+            self.advance(memory_model)
+            thread = self.process.GetSelectedThread()
+            self.function_name = thread.GetSelectedFrame().GetFunctionName()
+            self.line_entry = thread.GetSelectedFrame().GetLineEntry()
             
-            # Update stack
             if self.process.state != lldb.eStateExited:
                 for frame in thread.frames:
                     # in x86-64 the first stack frame is start before handing to main, skip it
-                    sf_name = "stack" + "-" + frame.GetDisplayFunctionName()
+                    sf_name = self.get_stack_frame_name(frame)
                     if "__libc_start" in sf_name:
                         continue
                     for v in frame.variables:
                         memory_model.add_from_stack(self.process, sf_name, v)
-
+            
             # Update stdout
             max_chars = 120
             s = self.process.GetSTDOUT(max_chars)
             if len(s) > 0:
                 self.stdout.append(s.rstrip())
-            
+    
+    # advance the program by a single step, taking care
+    # of various corner cases (handling malloc, etc)
+    def advance(self, memory_model):
+        
+        thread = self.process.GetSelectedThread()
+
+        begin_file = self.get_filename_of_current_line(thread)
+        begin_line_num = thread.GetSelectedFrame().GetLineEntry().GetLine()
+
+        # perform the step in LLDB
+        thread.StepInto()
+        
+        curr_fn = thread.GetSelectedFrame().GetFunctionName()
+        # glibc malloc has mangled function names
+        if curr_fn.endswith("malloc"):
+            handle_malloc(memory_model, thread, self.arch)
+        elif curr_fn.endswith("free"):
+            handle_free(memory_model, thread, self.arch)
+
+        # lazy way of detecting when we're in non-user functions
+        # this won't handle programs with code in multiple files
+        while not self.has_exited() and self.get_filename_of_current_line(thread) != self.main_filename: 
+            thread.StepOut()
+
+        # for reasons I don't yet understand step-into can sometimes do an instruction-level step?
+        # detect this by checking whether we changed line numbers, if not recurse
+        if self.get_filename_of_current_line(thread) == begin_file and \
+            thread.GetSelectedFrame().GetLineEntry().GetLine() == begin_line_num:
+            return self.advance(memory_model)
+
+    def get_filename_of_current_line(self, thread):
+        return thread.GetSelectedFrame().GetLineEntry().GetFileSpec().GetFilename()
+
+    def has_exited(self):
+        return self.process.state == lldb.eStateExited
+
 class MemoryModel:
     def __init__(self):
 
@@ -146,7 +170,6 @@ class MemoryModel:
         self.heap_alloc_sizes[address] = size
     
     def add_from_stack(self, process, section_name, v):
-
         #print(v.GetName(), v.GetAddress().GetSection().GetName(), v.location)
         # global variables show up on the stack frame, do not add them to the memory model
         sn = v.GetAddress().GetSection().GetName()
@@ -230,6 +253,16 @@ class MemoryModel:
 
                 mv = MemoryValue(section_name, int(child.location, 16), child.GetByteSize(), str(child.GetValue()), name, str(child.GetType()))
                 self.add(mv)
+
+    def get_memory_sections(self):
+        # partition by section
+        sections = dict()
+        sections["heap"] = list()
+        for addr, o in self.memory.items():
+            if o.section not in sections:
+                sections[o.section] = list()
+            sections[o.section].append(o) 
+        return sections
 
     def get_ordered(self):
         for addr in sorted(self.memory.keys()):

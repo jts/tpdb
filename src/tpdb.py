@@ -121,6 +121,14 @@ class MemoryWindow:
         lstr = pad_or_truncate(value.get_label_as_str(), self.max_label_length)
         self.label_window.addstr(idx + border_width, 1, lstr)
 
+    def clear(self):
+        self.addr_window.clear()
+        self.value_window.clear()
+        self.label_window.clear()
+
+        self.addr_window.refresh()
+        self.value_window.refresh()
+        self.label_window.refresh()
 
 def main(stdscr, program):
 
@@ -146,7 +154,6 @@ def main(stdscr, program):
     mem_x_start = code_width
     heap_window = MemoryWindow(mem_x_start, 0, heap_height, "heap")
 
-    stack_window = MemoryWindow(mem_x_start, heap_height, stack_height, "stack")
  
     # Output
     output_window = OutputWindow(0, code_height, code_width + MemoryWindow.get_width(), output_height, "stdout")
@@ -165,22 +172,45 @@ def main(stdscr, program):
         code_window.update_title(program.line_entry.GetFileSpec().GetFilename())
         code_window.update_code(code, ln)
 
-        # Memory
+        memory_by_section = memory_model.get_memory_sections()
+
+        # set the heap
         heap_count = 0
-        stack_count = 0
-        for v in memory_model.get_ordered():
-            if v.section == "heap":
-                heap_window.set(heap_count, v)
-                heap_count += 1
-            else:
-                stack_window.set(stack_count, v)
+        for heap_value in memory_by_section["heap"]:
+            heap_window.set(heap_count, heap_value)
+            heap_count += 1
+
+        del memory_by_section["heap"]
+
+        # create stack windows
+        stack = list()
+
+        # set the stack, creating new windows as needed
+
+
+        active_stack_frames = program.get_active_stack_frames()
+
+        curr_stack_start = heap_height
+        for stack_name in active_stack_frames:
+            if stack_name not in memory_by_section:
+                continue
+    
+            stack_values = sorted(memory_by_section[stack_name], key=lambda x: x.address)
+            curr_stack_height = len(stack_values) + 2 * border_width
+            stack_window = MemoryWindow(mem_x_start, curr_stack_start, curr_stack_height, stack_name)
+            stack.append(stack_window)
+            curr_stack_start += curr_stack_height
+            stack_count = 0
+            for stack_value in stack_values:
+                stack_window.set(stack_count, stack_value)
                 stack_count += 1
 
         # Output
         output_window.update(program.stdout)
 
         heap_window.draw()
-        stack_window.draw()
+        for s in stack:
+            s.draw()
         code_window.draw()
         output_window.draw()
 
@@ -188,7 +218,11 @@ def main(stdscr, program):
         key = code_window.window.getch()
         program.step(memory_model)
         curses.napms(50)
- 
+        
+        # needed to discard stack frames that drop out of scope
+        for s in stack:
+            s.clear()
+        
 #       
 program = ProgramState(sys.argv[1])
 curses.wrapper(main, program)
