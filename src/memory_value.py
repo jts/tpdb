@@ -93,7 +93,7 @@ class ProgramState:
         thread = self.process.GetSelectedThread()
         out = list()
         for f in thread.frames:
-            if f != None:
+            if f is not None:
                 out.append(self.get_stack_frame_name(f))
         return out
 
