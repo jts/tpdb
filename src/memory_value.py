@@ -93,7 +93,8 @@ class ProgramState:
         thread = self.process.GetSelectedThread()
         out = list()
         for f in thread.frames:
-            out.append(self.get_stack_frame_name(f))
+            if f != None:
+                out.append(self.get_stack_frame_name(f))
         return out
 
     def step(self, memory_model, n_steps=1):
