@@ -78,8 +78,11 @@ def handle_malloc(memory_model, thread, arch):
     error = lldb.SBError()
     malloc_size = arg0.GetData().GetUnsignedInt64(error, 0)
 
+    malloc_fn = thread.GetSelectedFrame().GetFunctionName()
+
     # advance the thread back to the calling function
-    thread.StepOut()
+    while thread.GetSelectedFrame().GetFunctionName() == malloc_fn:
+        thread.StepOut()
 
     # malloc's size argument is returned in register x0 on arm, or rax in x86
     ret = thread.GetSelectedFrame().FindRegister( get_register_for_return_value(arch) )
