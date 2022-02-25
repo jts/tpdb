@@ -162,7 +162,7 @@ def main(stdscr, program):
     output_window = OutputWindow(0, code_height, code_width + MemoryWindow.get_width(), output_height, "stdout")
 
     # command help
-    stdscr.addstr(code_height +  output_height, 0, " Press ENTER to advance line")
+    stdscr.addstr(code_height +  output_height, 0, " commands: (n)ext line (d)ump memory to tsv")
     stdscr.refresh()
     
 
@@ -224,7 +224,12 @@ def main(stdscr, program):
     
         #key = code_window.window.getstr()
         key = code_window.window.getch()
-        program.step()
+        if key == ord('n'):
+            program.step()
+        elif key == ord('d'):
+            fp = open("memory_dump.tsv", "w")
+            program.memory_model.write_tsv(fp)
+
         curses.napms(50)
         
         # needed to discard stack frames that drop out of scope

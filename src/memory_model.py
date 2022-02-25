@@ -24,7 +24,7 @@ class MemoryValue:
 
     def __str__(self):
         out = list()
-        out.append(self.section)
+        out.append(self.section.replace(" ", "-"))
         out.append(self.get_addr_as_str())
         out.append(str(self.size))
         out.append("(unknown)" if self.value is None else str(self.value))
@@ -293,9 +293,9 @@ class MemoryModel:
             sections[o.section].append(o) 
         return sections
 
-    def write_tsv(self):
+    def write_tsv(self, fp):
         # header
-        print("\t".join( [ "section", "address", "size", "value", "label", "type" ] ))
+        fp.write("\t".join( [ "section", "address", "size", "value", "label", "type\n" ] ))
 
         for addr in sorted(self.memory.keys()):
-            print(self.memory[addr])
+            fp.write("%s\n" % self.memory[addr])

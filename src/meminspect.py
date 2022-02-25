@@ -19,15 +19,6 @@ if len(sys.argv) != 3:
     sys.exit(1)
 
 program = ProgramState(sys.argv[1])
-
-#get_globals(target)
-#get_text_section(memory_model, target)
-
 n_steps = int(sys.argv[2])
 program.step(n_steps)
-
-#print("stdout:")
-#
-#for s in program.stdout:
-#    print(s)
-program.memory_model.write_tsv()
+program.memory_model.write_tsv(sys.stdout)
