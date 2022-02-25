@@ -1,6 +1,6 @@
 # Tiny program debugger (tpdb)
 
-This is a small set of tools based on llbd's excellent python API to debug tiny (<50 loc) C programs. It is indended to aid learning C programming for the first time, by displaying how the step-by-step execution of a program changes the state of the values stored in the stack and heap. `tpdb.py` is a curses program that allows the user to interactive step through the program. `meminspect.py` is a non-interactive program that writes out the state of memory after n steps of execution.
+This is a small set of tools based on llbd's excellent python API to debug tiny (<50 loc) C programs. It is intended to aid learning C programming for the first time, by displaying how the step-by-step execution of a program changes the state of the values stored in the stack and heap. `tpdb.py` is a curses program that allows the user to interactively step through the program. `meminspect.py` is a non-interactive program that writes out the state of memory after n steps of execution.
 
 The `examples` directory contains small C programs that can be used to demonstrate the functionality.
 
