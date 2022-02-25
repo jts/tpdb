@@ -14,9 +14,7 @@ char* remove_ext(char* s, char* ext)
 
 int main()
 {
-    char* input = "example.txt";
-    char test[] = "literal?";
+    char* input = "demo.txt";
     char* output = remove_ext(input, ".txt");
     puts(output);
-    puts(test);
 }

@@ -1,23 +1,6 @@
 import lldb
 from memory_model import *
 
-def get_text_section(memory_model, target):
-
-    module = target.module[target.executable.basename]
-
-    for section in module.sections:
-        for sub in section:
-            if sub.GetName() == "__cstring":
-                a = []
-                for b in sub.data.uint8:
-                    if b != 0:
-                        a.append(chr(b))
-                    else:
-                        a.append("\\0")
-                s = ''.join(a).replace("\n", "\\n")
-                #print("%s\t0x%0.16x\t%s\t%s\t%d" % ("text", sub.addr.GetLoadAddress(target), s, "null", sub.GetByteSize()))
-                mv = MemoryValue("text", sub.addr.GetLoadAddress(target), sub.GetByteSize(), s, None, None)
-                memory_model.add(mv)
 
 def get_globals(target):
     

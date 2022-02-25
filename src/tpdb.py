@@ -13,7 +13,8 @@ value_width = addr_width
 
 def pad_or_truncate(s, max_length):
     if len(s) > max_length:
-        return s[0:max_length]
+        # add a continuation mark
+        return s[0:(max_length - 3)] + "..."
     else:
         return s.ljust(max_length)
 
@@ -132,6 +133,8 @@ class MemoryWindow:
         self.label_window.refresh()
 
 def main(stdscr, program):
+    # hide cursor
+    curses.curs_set(0)
 
     # initialize windows
     code_height = 36
@@ -142,27 +145,27 @@ def main(stdscr, program):
     command_height = 1
     fixed_element_height = output_height + command_height
     code_height = curses.LINES - fixed_element_height
+    text_height = 1 + 2 * border_width
     heap_height = int(code_height / 2)
     stack_height = code_height - heap_height
-
-    # hide cursor
-    curses.curs_set(0)
 
     # Code
     code_window = CodeWindow(0, 0, code_width, code_height)
 
     # Memory
     mem_x_start = code_width
-    heap_window = MemoryWindow(mem_x_start, 0, heap_height, "heap")
 
+    text_window = MemoryWindow(mem_x_start, 0, text_height, ".text")
+    heap_window = MemoryWindow(mem_x_start, text_height, heap_height, "heap")
  
     # Output
     output_window = OutputWindow(0, code_height, code_width + MemoryWindow.get_width(), output_height, "stdout")
 
+    # command help
     stdscr.addstr(code_height +  output_height, 0, " Press ENTER to advance line")
     stdscr.refresh()
-    memory_model = MemoryModel()
     
+
     while True:
 
         # Update UI
@@ -173,7 +176,12 @@ def main(stdscr, program):
         code_window.update_title(program.line_entry.GetFileSpec().GetFilename())
         code_window.update_code(code, ln)
 
-        memory_by_section = memory_model.get_memory_sections()
+        memory_by_section = program.memory_model.get_memory_sections()
+        
+        # set the .text section, this only needs to happen once since it is read-only
+        if "text" in memory_by_section:
+            assert(len(memory_by_section["text"]) == 1)
+            text_window.set(0, memory_by_section["text"][0])
 
         # set the heap
         heap_count = 0
@@ -187,11 +195,9 @@ def main(stdscr, program):
         stack = list()
 
         # set the stack, creating new windows as needed
-
-
         active_stack_frames = program.get_active_stack_frames()
 
-        curr_stack_start = heap_height
+        curr_stack_start = heap_height + text_height
         for stack_name in active_stack_frames:
             if stack_name not in memory_by_section:
                 continue
@@ -209,15 +215,16 @@ def main(stdscr, program):
         # Output
         output_window.update(program.stdout)
 
+        text_window.draw()
         heap_window.draw()
         for s in stack:
             s.draw()
         code_window.draw()
         output_window.draw()
-
+    
         #key = code_window.window.getstr()
         key = code_window.window.getch()
-        program.step(memory_model)
+        program.step()
         curses.napms(50)
         
         # needed to discard stack frames that drop out of scope

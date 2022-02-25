@@ -65,7 +65,11 @@ class ProgramState:
         self.main_filename = sf.GetLineEntry().GetFileSpec().GetFilename()
         self.code = dict()
         self.stdout = list()
+        self.memory_model = MemoryModel()
         
+        # get the text section
+        self.memory_model.read_text_section(self.target)
+
     def get_code(self):
         d = self.line_entry.GetFileSpec().GetDirectory()
         f = self.line_entry.GetFileSpec().GetFilename()
@@ -99,9 +103,13 @@ class ProgramState:
             out.append(self.get_stack_frame_name(f))
         return out
 
-    def step(self, memory_model, n_steps=1):
+    def step(self, n_steps=1):
         for _ in range(0, n_steps):
-            self.advance(memory_model)
+
+            # advance the program exactly one execution step
+            self.advance()
+
+            # update state variables
             thread = self.process.GetSelectedThread()
             self.function_name = thread.GetSelectedFrame().GetFunctionName()
             self.line_entry = thread.GetSelectedFrame().GetLineEntry()
@@ -113,7 +121,7 @@ class ProgramState:
                     if "__libc_start" in sf_name:
                         continue
                     for v in frame.variables:
-                        memory_model.add_from_stack(self.process, sf_name, v)
+                        self.memory_model.add_from_stack(self.process, sf_name, v)
             
             # Update stdout
             max_chars = 120
@@ -123,7 +131,7 @@ class ProgramState:
     
     # advance the program by a single step, taking care
     # of various corner cases (handling malloc, etc)
-    def advance(self, memory_model):
+    def advance(self):
         
         thread = self.process.GetSelectedThread()
 
@@ -136,9 +144,9 @@ class ProgramState:
         curr_fn = thread.GetSelectedFrame().GetFunctionName()
         # glibc malloc has mangled function names
         if curr_fn.endswith("malloc"):
-            handle_malloc(memory_model, thread, self.arch)
+            handle_malloc(self.memory_model, thread, self.arch)
         elif curr_fn.endswith("free"):
-            handle_free(memory_model, thread, self.arch)
+            handle_free(self.memory_model, thread, self.arch)
 
         # lazy way of detecting when we're in non-user functions
         # this won't handle programs with code in multiple files
@@ -149,7 +157,7 @@ class ProgramState:
         # detect this by checking whether we changed line numbers, if not recurse
         if self.get_filename_of_current_line(thread) == begin_file and \
             thread.GetSelectedFrame().GetLineEntry().GetLine() == begin_line_num:
-            return self.advance(memory_model)
+            return self.advance()
 
     def get_filename_of_current_line(self, thread):
         return thread.GetSelectedFrame().GetLineEntry().GetFileSpec().GetFilename()
@@ -257,6 +265,24 @@ class MemoryModel:
                 mv = MemoryValue(section_name, int(child.location, 16), child.GetByteSize(), str(child.GetValue()), name, str(child.GetType()))
                 self.add(mv)
 
+    def read_text_section(self, target):
+
+        module = target.module[target.executable.basename]
+
+        for section in module.sections:
+            for sub in section:
+                if sub.GetName() == "__cstring":
+                    a = []
+                    for b in sub.data.uint8:
+                        if b != 0:
+                            a.append(chr(b))
+                        else:
+                            a.append("\\0")
+                    s = ''.join(a).replace("\n", "\\n")
+                    #print("%s\t0x%0.16x\t%s\t%s\t%d" % ("text", sub.addr.GetLoadAddress(target), s, "null", sub.GetByteSize()))
+                    mv = MemoryValue("text", sub.addr.GetLoadAddress(target), sub.GetByteSize(), s, None, None)
+                    self.add(mv)
+
     def get_memory_sections(self):
         # partition by section
         sections = dict()
@@ -266,10 +292,6 @@ class MemoryModel:
                 sections[o.section] = list()
             sections[o.section].append(o) 
         return sections
-
-    def get_ordered(self):
-        for addr in sorted(self.memory.keys()):
-            yield self.memory[addr]
 
     def write_tsv(self):
         # header

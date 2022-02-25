@@ -20,19 +20,14 @@ if len(sys.argv) != 3:
 
 program = ProgramState(sys.argv[1])
 
-# the memory values we harvest from the debugger are stored here
-memory_model = MemoryModel()
-
 #get_globals(target)
 #get_text_section(memory_model, target)
 
 n_steps = int(sys.argv[2])
-
-for _ in range(0, n_steps):
-    program.step(memory_model)
+program.step(n_steps)
 
 #print("stdout:")
 #
 #for s in program.stdout:
 #    print(s)
-memory_model.write_tsv()
+program.memory_model.write_tsv()
