@@ -1,8 +1,9 @@
 #! /usr/bin/env python
-
 from import_lldb import *
+
 import curses
-from memory_value import *
+from memory_model import *
+from import_lldb import *
 from utils import *
 
 border_width = 1

@@ -10,16 +10,11 @@ import lldb.utils.symbolication
 import argparse
 import sys
 import os
-from memory_value import *
+
+from memory_model import *
 from utils import *
 
 program = ProgramState(sys.argv[1])
-
-#run_commands(command_interpreter, ['settings set target.process.virtual-addressable-bits 39'])
-#run_commands(command_interpreter, ['settings show'])
-#breakpoint1 = target.BreakpointCreateByName("malloc")
-#breakpoint1 = target.BreakpointCreateByName("malloc")
-#breakpoint1 = target.BreakpointCreateByAddress("0x100003f90")
 
 # the memory values we harvest from the debugger are stored here
 memory_model = MemoryModel()
@@ -34,6 +29,7 @@ for _ in range(0, n_steps):
 
 print(memory_model.get_memory_sections())
 print("stdout:")
+
 for s in program.stdout:
     print(s)
 memory_model.write_tsv()

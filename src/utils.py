@@ -1,5 +1,5 @@
 import lldb
-from memory_value import *
+from memory_model import *
 
 def get_text_section(memory_model, target):
 
